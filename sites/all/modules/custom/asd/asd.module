@@ -1,0 +1,611 @@
+<?php
+/**
+ * Implements hook_menu.
+ */
+function asd_menu()
+{
+  $items = array();
+
+  $items['custom-search'] = array(
+	'title' => t(''),
+	'page callback' => 'get_searchedlist',
+	'access callback' => TRUE,
+	'type' => MENU_CALLBACK,
+  );
+
+ $items['addschoolwebsite'] = array(
+	'title' => t(''),
+	'page callback' => 'addschoolwebsite',
+	'access callback' => TRUE,
+	'type' => MENU_CALLBACK,
+  );
+	
+  
+  $items['college-search'] = array(
+	'title' => t(''),
+	'page callback' => 'get_collegelist',
+	'access callback' => TRUE,
+	'type' => MENU_CALLBACK,
+  );
+  
+  $items['colleges'] = array(
+		'page callback' => 'colleges_arguments',
+		'page arguments' => array(1, 2),
+		'access callback' => TRUE,
+		'type' => MENU_CALLBACK,
+  );
+  
+  $items['college-courses'] = array(
+		'page callback' => 'colleges_courses',
+		'page arguments' => array(1, 2),
+		'access callback' => TRUE,
+		'type' => MENU_CALLBACK,
+  );
+  
+  $items['college-address'] = array(
+		'page callback' => 'colleges_address',
+		'page arguments' => array(1, 2),
+		'access callback' => TRUE,
+		'type' => MENU_CALLBACK,
+  );
+  
+  	
+    return $items;
+}
+
+/**
+ * Implements blocks for module.
+ */
+function asd_block_info() {
+   $blocks = array();
+  
+  $blocks['search_form'] = array(
+    'info' => t('Search companies, directors'),
+    'cache' => DRUPAL_NO_CACHE,
+  );
+  
+  return $blocks;
+}
+
+/**
+ * Block View for module
+ */
+function asd_block_view($delta='')
+{
+	global $base_url;
+	/* block view incase search form */ 
+	switch ($delta) {
+            case 'search_form':
+            $block = array(
+                    'subject' => t('Search companies, directors'),
+                    'content' => search_form_content(),
+            );
+            break;
+	}
+        
+	return $block;	
+}
+
+function search_form_content()
+{
+    $types = "SELECT DISTINCT college_type FROM college_type_last_2";
+    $result_types = db_query($types)->fetchAll();
+    
+    $states = "SELECT DISTINCT state FROM college_type_last_2";
+    $result_states = db_query($states)->fetchAll();
+    
+    return theme('search_form_custom_form', array('result_types' => $result_types, 'college_states' => $result_states)); 
+}
+
+function asd_theme($existing, $type, $theme, $path) {   
+  
+  return array(
+        'search_form_custom_form' => array(
+                                    'template' => 'search-form-custom-form',
+                                    'path' => $path . '/templates',
+                                    'type' => 'theme',
+                                    'arguments' => array('variables' => NULL),
+        ),  
+        
+        'colleges_detail_page' => array(
+                                'template' => 'templates/colleges-detail-page',
+                                'arguments' => array('variables' => NULL),
+        ),
+        
+        'no_college_found_page' => array(
+                                'template' => 'templates/no-college-found-page',
+                                'arguments' => array('variables' => NULL),
+        ),
+       'colleges_courses_page' => array(
+                                'template' => 'templates/colleges-courses-page',
+                                'arguments' => array('variables' => NULL),
+        ),
+       'colleges_courses_no_page' => array(
+                                'template' => 'templates/colleges-courses-no-page',
+                                'arguments' => array('variables' => NULL),
+        ),
+	
+        'college_address_detail_page' => array(
+                                'template' => 'templates/college-address-detail-page',
+                                'arguments' => array('variables' => NULL),
+        ),
+				
+    );
+}
+
+
+function addschoolwebsite() {
+if($_POST) {
+  $websiteUrl = $_POST['website'];
+  $school = $_POST['school'];
+  $aff = $_POST['aff'];
+
+	$school = preg_replace("/[^a-zA-Z0-9]/", " ", $school);
+	$school = trim(preg_replace('/-/', ' ', $school));
+	$school = trim(preg_replace('/\s+/', ' ', $school));
+
+	$aff = preg_replace("/[^a-zA-Z0-9]/", " ", $aff);
+
+	$nid = db_insert('schools_website') // Table name no longer needs {}
+	->fields(array(
+	  'affilaition_number' => $aff,
+	  'school' => $school,
+	  'submitted_website' => $websiteUrl,
+	))
+	->execute();
+
+	
+
+      $params = array(
+	'subject' => t('School Website Add Alret'),
+	'body' => 'Hi someone added ' . $school . ' - Affiliation Number - ' . $aff . ' website - ' . $websiteUrl ." Please review it.",
+	);
+
+	// Send out the e-mail.
+	drupal_mail('asd', 'school_website_add', "datazhouse79@gmail.com", language_default(), $params);
+	
+	echo "submitted";
+}
+}
+
+
+
+
+function get_searchedlist()
+{
+	if($_POST)
+	{
+		$arg=$_POST['search'];
+		if($arg != '') 
+		{
+			global $base_url;
+			$filter = $_POST['filter']; 
+			$arg = trim($arg);
+			$query = '';
+			
+			$arg = preg_replace("/[^a-zA-Z0-9]/", " ", $arg);
+			$arg = trim(preg_replace('/-/', ' ', $arg));
+			$arg = trim(preg_replace('/\s+/', ' ', $arg));
+			$show_result = array();
+			if($filter == 'company')
+			{
+				$identity = 'company';
+								
+				$terms = explode(" ", $arg);
+				if(count($terms) == 1)
+				{
+					$id_search = trim($arg);
+				}
+				else
+				{
+					$id_search = '';
+				}
+				
+				
+				if($id_search == '')
+				{	
+					$sql = "SELECT cin,company_name,registered_state FROM companies_last_2 WHERE company_name LIKE '$arg%' LIMIT 5";
+				}
+				else {
+					$sql = "SELECT cin,company_name,registered_state FROM companies_last_2 WHERE company_name LIKE '$arg%' OR cin = '$id_search' LIMIT 5";
+				}
+				
+				
+				
+				$results = db_query($sql)->fetchAll();
+				if(count($results) > 0)
+				{
+					foreach($results as $key => $result)
+					{
+						$company_name = trim($result->company_name);	
+						$company_name = preg_replace("/[^a-zA-Z0-9]/", " ", $company_name);
+						$company_name = trim(preg_replace('/-/', ' ', $company_name));
+						$company_name = trim(preg_replace('/\s+/', ' ', $company_name));
+						$company_name = strtoupper($company_name);
+						$show_result[$key]['name'] = $company_name;
+						$company_terms = explode(' ',$company_name);
+						$show_result[$key]['url'] = strtolower(implode('-',$company_terms)); 	
+						$show_result[$key]['cin'] = strtolower($result->cin);
+						$show_result[$key]['state'] = "( <b>State : </b>" . $result->registered_state . " )" ;
+					}
+				}
+			}
+			elseif($filter == 'director')
+			{   
+				$identity = 'director';
+				
+				$terms = explode(" ", $arg);
+				if(count($terms) == 1 && is_numeric(trim($terms[0])))
+				{
+					$id_search = trim($arg);
+				}
+				else
+				{
+					$id_search = '';
+				}
+				
+				
+				if($id_search == '')
+				{	
+					$sql = "SELECT DISTINCT din,dir_name,dir_address,post,date_of_appointment,cin,company_name FROM directors_last_2 WHERE dir_name LIKE '$arg%' LIMIT 5";
+				}
+				else {
+					$sql = "SELECT DISTINCT din,dir_name,dir_address,post,date_of_appointment,cin,company_name FROM directors_last_2 WHERE dir_name LIKE '$arg%' OR din = $id_search LIMIT 5";
+				}
+				
+				$results = db_query($sql)->fetchAll();
+				if(count($results) > 0)
+				{
+					foreach($results as $key => $result)
+					{
+						$director_name = trim($result->dir_name);	
+						$director_name = preg_replace("/[^a-zA-Z0-9]/", " ", $director_name);
+						$director_name = trim(preg_replace('/-/', ' ', $director_name));
+						$director_name = trim(preg_replace('/\s+/', ' ', $director_name));
+						$director_name = strtoupper($director_name);
+						$show_result[$key]['name'] = $director_name;
+						$director_terms = explode(' ',$director_name);
+						$show_result[$key]['url'] = strtolower(implode('-',$director_terms)); 	
+						$show_result[$key]['cin'] = $result->din;
+						$show_result[$key]['state'] = "( <b>Company : </b>" . $result->company_name . " )" ;
+					}
+				}
+			}
+			
+			if(count($show_result) > 0)
+			{
+				foreach($show_result as $value) 
+				{ 
+					if($identity == 'node') { 
+					 
+					$alias = drupal_get_path_alias('node/'.$value['cin']);
+					?> 
+						<li ><a class="white" href="<?php echo "/" . $alias; ?>"><?php echo $value['name']." ".$value['state'];?></a></li>
+					<?php } else { ?>
+					<li><a href="<?php echo $base_url."/".$identity ."/". $value['url'] . '/' . $value['cin']; ?>"><?php echo $value['name']." ".$value['state'];?></a></li>
+					<?php
+					
+					}
+				}
+			}
+			else
+			{
+				?>
+					<li ><a class="white" href="javascript:void(0)"><?php echo "No result found"; ?></a></li>
+				<?php
+			}
+		}
+	}
+}
+
+
+
+
+function colleges_arguments($name, $id) {
+	if($id != '')
+	{ 
+		global $base_url;
+		global $user;
+		
+		//Getting Types Details
+		$types = "SELECT college_type FROM college_type_last_2 WHERE college_id = $id";
+		$result_types = db_query($types)->fetchAll();
+		
+		//Getting Courses Details
+		$courses = "SELECT * FROM college_courses_last_2 WHERE college_id = $id";
+		$result_courses = db_query($courses)->fetchAll();
+		
+		$sql = "SELECT * FROM colleges_last_2 WHERE id = $id";
+		$results = db_query($sql)->fetchAssoc();
+		
+		if(array_key_exists('college_name', $results))
+		{
+			$display = Array();
+			$collegeName = strtolower($results['college_name']);	
+			
+			drupal_set_title($results['college_name'] . " " . $results['state'] . " - College, website, courses offered, address and contact details.");
+			
+			$breadcrumb = array();
+			$breadcrumb[] = l('Home', $base_url);
+			$breadcrumb[] = l('Colleges', $base_url."/colleges");
+			$breadcrumb[] = ucwords($collegeName);
+			drupal_set_breadcrumb($breadcrumb);	
+			
+			$display['id'] = $results['id'];
+			$display['name'] = $results['college_name'];
+			//$display['type'] = $results['type'];
+			$display['state'] = $results['state'] == '' ? 'N/A' : $results['state'];
+			$display['address'] = $results['address'] == '' ? 'N/A' : $results['address'];
+			$display['university'] = $results['university'] == '' ? 'N/A' : $results['university'];
+			$display['foundation_year'] = $results['foundation_year'] == '' ? 'N/A' : $results['foundation_year'];
+			 $display['website'] = $results['website'] == '' ? 'N/A' : $results['website'];
+			$display['phone'] = $results['phone'] == '' ? 'N/A' : $results['phone'];
+			$display['mobile'] = $results['mobile'] == '' ? 'N/A' : $results['mobile'];
+			$display['location'] = $results['location'] == '' ? 'N/A' : $results['location'];
+			$display['email'] = $results['email'] == '' ? '' : $results['email'];
+			$display['fax'] = $results['fax'] == '' ? 'N/A' : $results['fax'];
+			$display['management'] = $results['management'] == '' ? 'N/A' : $results['management'];
+					
+			$college_desc = ucwords($collegeName) . " is located in ". $display['state'] . ". It was founded in " . $display['foundation_year'] . ".<br><br>";
+			
+			$college_desc .= ucwords($collegeName) . " is affiliated by " . $display['university'] . ". Its location as per record is " . $display['location'] . " and its address is " . $display['address'] . ".<br><br>";
+		    
+			$college_desc .= ucwords(strtolower($collegeName)) . "'s website is " . $display['website'] . ". " . ucwords($collegeName) . " can be contacted at phone number " . $display['phone'] . "or on mobile number ".$display['mobile']." <br><br>";
+			
+			$college_desc .= ucwords(strtolower($collegeName)) . " email address is " . $display['email'] . " can be contacted at fax number " . $display['fax'] . ". " . $display['management'] . " is the management wing for ".ucwords(strtolower($collegeName)) .". <br><br>Find all the courses offered by ".ucwords(strtolower($collegeName))." below.<br><br>";
+			
+			$display['college_desc'] = $college_desc;
+			
+			$description = 'Complete information on '.ucwords(strtolower($collegeName)).'. Find out list of all courses offered by ' . ucwords(strtolower($collegeName)) . ', contact details, email address, type of ' . ucwords(strtolower($collegeName));
+			
+			$meta_description = array(
+					'#type' => 'html_tag',
+					'#tag' => 'meta',
+					'#attributes' => array(
+							'name' => 'description',
+							'content' =>  $description
+					));
+
+			drupal_add_html_head( $meta_description, 'meta_description' );
+			
+			$meta_keywords = array(
+					'#type' => 'html_tag',
+					'#tag' => 'meta',
+					'#attributes' => array(
+							'name' => 'keywords',
+							'content' =>  $collegeName.", ".$collegeName." address, ".$collegeName." website, " .$collegeName." email address, " . $collegeName." contact numbers, affiliation university of " . $collegeName . ", fax number of " . $collegeName
+					
+					));
+
+			drupal_add_html_head( $meta_keywords, 'meta_keywords' );
+			
+			return theme('colleges_detail_page', array('result' => $display, 'types' => $result_types,'courses' => $result_courses));
+		} else {
+                        $name = str_ireplace("-", " ", $name);
+                        $exploding = explode(" ",trim($name));
+                        $nameString = $exploding[0];
+                        
+                        $sql ="select * from colleges_last_2 where college_name like '%".$nameString."%' limit 20";
+						$result_similar = db_query($sql)->fetchAll();
+                        return theme('no_college_found_page', array('similar' => $result_similar));
+		}
+	}
+}
+
+
+
+
+function asd_form_alter(&$form, $form_state, $form_id) { 
+  if($form_id == 'contact_site_form') {
+  $form['subject']['#access'] = FALSE;
+  $form['name']['#required'] = 0;
+  $form['name']['#access'] = FALSE;
+  $form['copy']['#access'] = FALSE;
+  }
+  
+}
+
+
+/**
+ * Implements hook_mail for module_name.
+ */
+
+function asd_mail($key, &$message, $params){
+// Set the mail content type to html to send an html e-mail (optional).
+  $message['headers']['Content-Type'] = 'text/html; charset=UTF-8; format=flowed';
+
+  // Grab the subject and body from params and add it to the message.
+  $message['subject'] = $params['subject'];
+  $message['body'][] = $params['body']; // Drupal 7
+  
+  switch ($key) {
+    
+    case "school_website_add":
+      // Make other changes here if desired...
+      break;
+  }
+
+}
+
+
+/**
+ *Implementation of hook_preprocess_page
+ */
+function asd_preprocess_page(&$variables){ 
+    //if (isset($variables['page']['content']['system_main']['content']['default_message'])) {
+        //Remove Default Message
+        unset($variables['page']['content']['system_main']['content']['default_message']);
+        //Remove Default Title
+        drupal_set_title('One stop solution for data related searches');
+  
+	if (drupal_is_front_page()) {
+	$description = "Datazhouse is an one stop solution for all your data related needs. Datazhouse provides detailed information on companies incorporated in india, their directors, charges on them if any, list of banks with their ifsc, micr codes. You can find indian colleges information with their faculties contact and qualification details. You can find indian schools on datazhouse with their contact details. Datazhouse also provide tutorials, online tutorials like php, mysql, java, angular js etc. You can also check transporters on datazhouse and can contact them. Datazhouse also has list of indian universities with their contact details.";
+	$meta_description = array(
+					'#type' => 'html_tag',
+					'#tag' => 'meta',
+					'#attributes' => array(
+							'name' => 'description',
+							'content' =>  $description
+					));
+
+	drupal_add_html_head( $meta_description, 'meta_description' );
+
+
+	$meta_keywords = array(
+					'#type' => 'html_tag',
+					'#tag' => 'meta',
+					'#attributes' => array(
+							'name' => 'keywords',
+							'content' =>  "Companies, Companies in india, statewise companies, indian companies, companies incorporated in india, list of indian companies directors,indian schools, universities in india, banks ifsc codes, micr codes, transporters, tutorials, php tutorial, mysql tutorial, angular js tutorial, java tutorial",
+					
+					));
+
+			drupal_add_html_head( $meta_keywords, 'meta_keywords' );
+
+
+	}
+	
+   
+   //}        
+}
+
+function asd_element_info_alter(&$type){
+  // Increase the default weight range
+  if (isset($type['weight']['#delta'])) {
+    $type['weight']['#delta'] = 120;
+  }    
+}
+
+
+
+function get_collegelist() {
+	if($_POST)
+	{
+		$college=$_POST['college'];
+		if($college != '') 
+		{
+			global $base_url;
+			$state = $_POST['state']; 
+			$collegeType = $_POST['collegeType']; 
+			$college = trim($college);
+			$query = '';
+			$college = preg_replace("/[^a-zA-Z0-9]/", " ", $college);
+			$college = trim(preg_replace('/-/', ' ', $college));
+			$college = trim(preg_replace('/\s+/', ' ', $college));
+			$show_result = array();
+			if($state != 'all')
+			{
+				$query = "SELECT * FROM college_type_last_2 WHERE college_name LIKE '$college%' AND college_type = '".$collegeType."' AND state = '".$state."' LIMIT 5";
+			} else {
+				$query = "SELECT * FROM college_type_last_2 WHERE college_name LIKE '$college%' AND college_type = '".$collegeType."' LIMIT 5";
+			}
+			
+			$results = db_query($query)->fetchAll();
+			$show_result = array();
+			if(count($results) > 0)
+				{
+					foreach($results as $result)
+					{
+						
+						$college_name = trim($result->college_name);	
+						$college_name = preg_replace("/[^a-zA-Z0-9]/", " ", $college_name);
+						$college_name = trim(preg_replace('/-/', ' ', $college_name));
+						$college_name = trim(preg_replace('/\s+/', ' ', $college_name));
+						$college_name = strtoupper($college_name);
+						?>
+						<li><a href="<?php echo $base_url . '/colleges/' . strtolower(trim(preg_replace('/\s+/', '-', preg_replace(" /[^a-zA-Z0-9]/ ", " ", $college_name)))) . '/' . $result->college_id; ?>"><?php echo $college_name . " ( " . $result->state . " )";?></a></li>
+						<?php
+						
+					}
+				} else {
+					?>
+						<li>No record found</li>
+					<?php
+				}	
+		}
+	}
+}
+
+function colleges_courses($name, $id) {
+    if($id != '')
+	{ 
+            global $base_url; global $user;
+            
+            $courses = "SELECT * FROM college_courses_last_2 WHERE college_id = $id";
+            $result_courses = db_query($courses)->fetchAll();
+			$coursesArray = array();
+			$courseString = "(";
+			foreach($result_courses as $result_course) {
+				$courseString .= "'" . $result_course->course_type . "',";
+			} 
+			$courseString = rtrim($courseString, ",");
+			$courseString .= ")";
+			
+			$relatedColleges = "SELECT DISTINCT college_id, college_name from college_courses_last_2 WHERE course_type IN $courseString LIMIT 10"; 
+			
+			$relatedColleges = db_query($relatedColleges)->fetchAll();
+            
+            if(count($result_courses) > 0) {
+                return theme('colleges_courses_page', array('courses' => $result_courses,'name' => $name, 'college_id' => $id, 'relatedColleges' => $relatedColleges));
+            } else {
+                return theme('colleges_courses_no_page', array('name' => $name, 'college_id' => $id));
+            }
+        }
+}
+
+
+function colleges_address($name, $id) {
+	
+	if($id != '') { 
+		global $base_url; global $user;
+
+		$startingLetter = substr($name,0,2);
+		//Getting similiar colleges
+		$similiar_clleges = "SELECT id, college_name FROM colleges_last_2 WHERE college_name LIKE '$startingLetter%' AND id != $id LIMIT 10";
+		$result_similiar_colleges = db_query($similiar_clleges)->fetchAll();
+
+		$sql = "SELECT * FROM colleges_last_2 WHERE id = $id";
+		$results = db_query($sql)->fetchAll();
+		if(count($results) > 0) {
+			$meta_keywords = array(
+					'#type' => 'html_tag',
+					'#tag' => 'meta',
+					'#attributes' => array(
+							'name' => 'keywords',
+							'content' =>  $results[0]->college_name . " address, address of " . $results[0]->college_name.", ".$results[0]->college_name." contact address details"
+					)
+			);
+
+			drupal_add_html_head( $meta_keywords, 'meta_keywords' );
+			$meta_description = array(
+				'#type' => 'html_tag',
+				'#tag' => 'meta',
+				'#attributes' => array(
+						'name' => 'description',
+						'content' => 'Find out the address of '.$results[0]->college_name.' with map.'
+				));
+
+			drupal_add_html_head( $meta_description, 'meta_description' );
+			
+			drupal_set_title($results[0]->college_name . " - Address information with map.");
+			
+			$college_name = trim($results[0]->college_name);	
+			$college_name = preg_replace("/[^a-zA-Z0-9]/", " ", $college_name);
+			$college_name = trim(preg_replace('/-/', ' ', $college_name));
+			$college_name = trim(preg_replace('/\s+/', ' ', $college_name));
+			$college_name = strtoupper($college_name);
+			$company_terms = explode(' ',$college_name);
+			$url = $base_url.'/company/'.implode('-',$company_terms).'/'.$results[0]->cin;
+			
+			$breadcrumb = array();
+			$breadcrumb[] = l('Home', $base_url);
+			$breadcrumb[] = l(ucwords(strtolower($results[0]->college_name)), $url);
+			$breadcrumb[] = ucwords(strtolower('Address'));
+			drupal_set_breadcrumb($breadcrumb);	
+			
+			return theme('college_address_detail_page',array('results' => $results,'result_similiar_comp' =>$result_similiar_colleges,'startingLetter' => $startingLetter));
+		}
+	}
+}
+
+

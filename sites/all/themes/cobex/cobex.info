@@ -1,0 +1,25 @@
+name = cobex
+description = A theme from cobex
+package = Core
+version = VERSION
+core = 7.x
+
+
+; Styles
+stylesheets[all][] = css/bootstrap.css
+stylesheets[all][] = css/style.css
+stylesheets[all][] = css/index.css
+
+; Scripts
+;scripts[] = js/jquery.min.js
+
+
+regions[header_top] = Header Top
+regions[header_mid_right] = Header Middle Right
+regions[header_search] = Header search
+regions[header_cart] = Header Cart
+regions[banner] = Banner
+
+regions[content] = Content
+
+screenshot = screenshot.png

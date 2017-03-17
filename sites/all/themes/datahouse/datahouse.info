@@ -1,0 +1,55 @@
+name = Datazhouse Theme
+description = Datazhouse Theme
+core = 7.x
+
+
+;;;;;;;;;;;;;;;;;;;;;
+;; Regions
+;;;;;;;;;;;;;;;;;;;;;
+
+regions[navigation]     = 'Navigation'
+regions[header]         = 'Page header'
+regions[highlighted]    = 'Highlighted'
+regions[help]           = 'Help'
+regions[top_right_menu] = 'Top Right Menu'
+regions[search]         = 'Search'
+regions[content]        = 'Content'
+regions[sidebar_first]  = 'Primary'
+regions[sidebar_second] = 'Secondary'
+regions[footerl]        = 'Footer left'
+regions[footerc]        = 'Footer center'
+regions[footerr]        = 'Footer right'
+regions[page_top]       = 'Page top'
+regions[page_bottom]    = 'Page bottom'
+regions[contact]        = 'Contact'
+
+
+;;;;;;;;;;;;;;;;;;;;;
+;; Stylesheets
+;;;;;;;;;;;;;;;;;;;;;
+
+stylesheets[all][] = css/bootstrap.min.css
+stylesheets[all][] = css/colorbox.css
+stylesheets[all][] = css/font-awesome.css
+stylesheets[all][] = css/jquery-ui.css
+stylesheets[all][] = css/select2.css
+stylesheets[all][] = css/select2-bootstrap.css
+stylesheets[all][] = css/style.css
+stylesheets[all][] = css/ionicons.min.css
+stylesheets[all][] = css/icon-font.min.css
+stylesheets[all][] = css/AdminLTE.min.css
+stylesheets[all][] = css/styles.css
+stylesheets[all][] = css/dropzone.css
+
+;;;;;;;;;;;;;;;;;;;;;
+;; Scripts
+;;;;;;;;;;;;;;;;;;;;;
+scripts[] = js/bootstrap.min.js
+scripts[] = js/custom.js
+scripts[] = js/jquery.js
+scripts[] = js/jRate.js
+scripts[] = js/select2.js
+scripts[] = js/site.js
+
+
+

@@ -1,0 +1,788 @@
+<?php
+/**
+* Implements hook_menu.
+*/
+function company_menu() {
+$items = array();
+
+$items['company'] = array(
+    'page callback' => 'company_arguments',
+    'page arguments' => array(1, 2),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+);
+
+$items['buy-company-documents'] = array(
+    'page callback' => 'buy_company_documents',
+    'page arguments' => array(1),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+);
+
+$items['company-director'] = array(
+    'page callback' => 'company_directors',
+    'page arguments' => array(1, 2),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+);
+$items['company-charges'] = array(
+    'page callback' => 'company_charges',
+    'page arguments' => array(1, 2),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+);
+$items['company-address'] = array(
+    'page callback' => 'company_address',
+    'page arguments' => array(1, 2),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+);
+
+$items['addcompanywebsite'] = array(
+    'title' => t(''),
+    'page callback' => 'addcompanywebsite',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+);
+
+
+$items['addcompanyemail'] = array(
+    'title' => t(''),
+    'page callback' => 'addcompanyemail',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+);
+
+$items['update'] = array(
+    'page callback' => 'update_company',
+    'page arguments' => array(1),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+);
+
+$items['director'] = array(
+    'page callback' => 'director_arguments',
+    'page arguments' => array(1, 2),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+);
+
+return $items;
+
+}
+
+/**
+* Implements hook_theme.
+*/
+function company_theme($existing, $type, $theme, $path) {   
+return array(
+        'company_detail_page' => array(
+            'template' => 'templates/company-detail-page',
+            'arguments' => array('variables' => NULL),
+        ),
+        'director_detail_page' => array(
+            'template' => 'templates/director-detail-page',
+            'arguments' => array('variables' => NULL),
+        ), 
+        'no_director_found_page' => array(
+            'template' => 'templates/no-director-found-page',
+            'arguments' => array('variables' => NULL),
+        ),
+        'company_director_detail_page' => array(
+            'template' => 'templates/company-director-detail-page',
+            'arguments' => array('variables' => NULL),
+        ),
+        'company_charge_detail_page' => array(
+            'template' => 'templates/company-charge-detail-page',
+            'arguments' => array('variables' => NULL),
+        ),
+        'company_address_detail_page' => array(
+            'template' => 'templates/company-address-detail-page',
+            'arguments' => array('variables' => NULL),
+        ),
+        'no_company_found_page' => array(
+            'template' => 'templates/no-company-found-page',
+            'arguments' => array('variables' => NULL),
+        ),
+        'no_company_director_found_page' => array(
+            'template' => 'templates/no-company-director-found-page',
+            'arguments' => array('variables' => NULL),
+        ),
+        'no_company_charges_found_page' => array(
+            'template' => 'templates/no-company-charges-found-page',
+            'arguments' => array('variables' => NULL),
+        ),
+    );
+}
+
+function get_company_name_by_cin($cin) {
+    
+    $sql = "select company_name from companies_last_2 where cin like '$cin'";
+    $results = db_query($sql)->fetchAssoc();
+    
+    return $results['company_name'];
+}
+
+function buy_company_documents() {
+global $user,$base_url;
+
+$path = current_path();
+
+ctools_include('ajax');
+
+$commands = array();
+
+$comp_id = arg(1); 
+$pid = '';
+
+$company_name = get_company_name_by_cin($comp_id);
+
+$is_unique_sku = commerce_product_validate_sku_unique($comp_id,$pid); 
+
+if($is_unique_sku == 1) {
+    $product = commerce_product_new('product');
+    $product->sku = $comp_id;
+    $product->title = $company_name . "-" . $comp_id;
+    $product->language = LANGUAGE_NONE;
+    $product->uid = 1;
+    $product->commerce_price[LANGUAGE_NONE][0] = array(
+        'amount' => 20*10, 
+        'currency_code' => "INR",
+    );
+    //saving product
+    commerce_product_save($product);
+    //adding newly created product to cart
+    docs_adding_product_to_cart($product->product_id,1,$user->uid);
+    //redirecting user
+
+    $html = '<a href="'.$base_url.'/cart" class="btn btn-info btn-block" ><i class="fa fa-location-arrow" aria-hidden="true"></i> Added to Cart</a>';			
+
+    $commands[] = ajax_command_replace('.add_to_cart_'.$comp_id, $html);
+
+    unset($_SESSION['messages']['status']);
+
+    print ajax_render($commands);
+
+    exit;
+
+
+    } else {
+        $product = commerce_product_load_by_sku($comp_id);
+        //adding existing product to cart
+        docs_adding_product_to_cart($product->product_id,1,$user->uid);
+        
+        $html = '<a href="'.$base_url.'/cart" class="btn btn-info btn-block" ><i class="fa fa-location-arrow" aria-hidden="true"></i> Added to Cart</a>';			
+
+        $commands[] = ajax_command_replace('.add_to_cart_'.$comp_id, $html);
+
+        unset($_SESSION['messages']['status']);
+
+        print ajax_render($commands);
+
+        exit;
+    }
+}
+
+function docs_adding_product_to_cart($product_id, $quantity, $uid) {
+$line_item = NULL;
+if ($product = commerce_product_load($product_id)) {
+        $line_item = commerce_product_line_item_new($product, $quantity);
+        $line_item = commerce_cart_product_add($uid, $line_item);
+    }
+}
+
+
+
+
+function addcompanywebsite() {
+if($_POST) {
+    
+    $websiteUrl = $_POST['website'];
+    $submitterName = $_POST['subname'];
+    $submitterEmail = $_POST['subemail'];
+    
+    $company = $_POST['company'];
+    
+    $cin = $_POST['cin'];
+    
+    $company = preg_replace("/[^a-zA-Z0-9]/", " ", $company);
+    $company = trim(preg_replace('/-/', ' ', $company));
+    $company = trim(preg_replace('/\s+/', ' ', $company));
+    
+    $submitter_name = preg_replace("/[^a-zA-Z0-9]/", " ", $submitterName);
+    
+    $cin = preg_replace("/[^a-zA-Z0-9]/", " ", $cin);
+    
+    $nid = db_insert('companies_website') // Table name no longer needs {}
+        ->fields(array(
+        'cin' => $cin,
+        'name' => $company,
+        'submitter_name' => $submitter_name,
+        'submitter_email' => $submitterEmail,
+        'submitted_website' => $websiteUrl,
+    ))->execute();
+    
+    if($submitter_name != ''){
+        $submitter_name = $submitter_name;
+       } else {
+           $submitter_name = 'someone';
+       } 
+    if($submitterEmail != '') {
+        $submitterEmail = $submitterEmail;
+    } else {
+        $submitterEmail = 'email';
+    }
+    $params = array(
+        'subject' => t('Company Website Add Alret'),
+        'body' => 'Hi '.$submitter_name.' having email ID ('.$submitterEmail.') added ' . $company . ' - CIN - ' . $cin . ' website - ' . $websiteUrl ." Please review it.",
+    );
+    // Send out the e-mail.
+    drupal_mail('company', 'website_add', "datazhouse79@gmail.com", language_default(), $params);
+    echo "submitted";
+    }
+}
+
+function update_company($cin) {
+global $user,$base_url;
+
+$path = current_path();
+ctools_include('ajax');
+
+$commands = array();
+
+if(!user_is_logged_in()) {
+    $commands[] = ajax_command_replace('.update_'.$cin, "Login to update");
+    print ajax_render($commands);
+    exit;
+}
+
+$nid = db_insert('company_update_request') // Table name no longer needs {}
+    ->fields(array(
+    'cin' => $cin,
+    'uid' => $user->uid,
+))->execute();
+
+$html = '<a href="javascript:void(0);" class="btn btn-success btn-block" ><i class="fa fa-clock-o" aria-hidden="true"></i> Will Update Soon</a>';			
+
+$commands[] = ajax_command_replace('.update_'.$cin, $html);
+
+unset($_SESSION['messages']['status']);
+
+print ajax_render($commands);
+
+exit;
+}
+
+function addcompanyemail(){
+if($_POST) {
+    $email = $_POST['email'];
+    
+    $submitteremail = $_POST['semail'];
+    $submittername = $_POST['sname'];
+    
+    $company = $_POST['company'];
+    $cin = $_POST['cin'];
+    $company = preg_replace("/[^a-zA-Z0-9]/", " ", $company);
+    $company = trim(preg_replace('/-/', ' ', $company));
+    $company = trim(preg_replace('/\s+/', ' ', $company));
+    
+    $submitter_name = preg_replace("/[^a-zA-Z0-9]/", " ", $submittername);
+    
+    $cin = preg_replace("/[^a-zA-Z0-9]/", " ", $cin);
+    $nid = db_insert('companies_email') // Table name no longer needs {}
+        ->fields(array(
+        'cin' => $cin,
+        'name' => $company,
+        'submitter_name' => $submitter_name,
+        'submitter_email' => $submitteremail,
+        'submitted_email' => $email,
+        ))->execute();
+    
+    if($submitter_name != ''){
+        $submitter_name = $submitter_name;
+       } else {
+           $submitter_name = 'someone';
+       } 
+    if($submitteremail != '') {
+        $submitteremail = $submitteremail;
+    } else {
+        $submitteremail = 'email';
+    }
+    
+    $params = array(
+        'subject' => t('Company Email Add Alret'),
+        'body' => 'Hi '.$submitter_name.' having email ID ('.$submitteremail.') added ' . $company . ' - CIN - ' . $cin . ' email - ' . $email ." Please review it.",
+    );
+    // Send out the e-mail.
+    drupal_mail('company', 'company_email_add', "datazhouse79@gmail.com", language_default(), $params);
+    echo "submitted";
+    }
+}
+
+function company_arguments($name, $cin) { 
+if($cin != ''){   
+    global $base_url;
+    global $user;
+    ctools_include('ajax');
+    $single_commands = array();
+    $site_name =  variable_get('site_name', 'Drupal');
+    $companyNameWord = explode("-", $name);
+    $startingLetter = $companyNameWord[0]; 
+    //Getting Directors Details
+    $directors = "SELECT DISTINCT din,dir_name,dir_address,post,date_of_appointment FROM directors_last_2 WHERE cin = '$cin'";
+    $result_directors = db_query($directors)->fetchAll();
+    //Getting Website Details
+    //$websites = "SELECT * FROM companies_website WHERE cin = '$cin' and website is not null";
+    //$result_website = db_query($websites)->fetchAssoc();
+    //Getting email Details
+    //$emails = "SELECT * FROM companies_email WHERE cin = '$cin' and email is not null";
+    //$result_email = db_query($emails)->fetchAssoc();
+    //Getting similiar companies
+    $similiar_comp = "SELECT cin,company_name FROM companies_last_2 WHERE company_name LIKE '$startingLetter%' AND cin != '$cin' LIMIT 10";
+    $result_similiar_comp = db_query($similiar_comp)->fetchAll();
+    
+    //Getting Charges Details
+    $charges = "SELECT DISTINCT charge_creation_date,charge_amount,charge_holder,charge_address FROM company_charges_last_2 WHERE cin = '$cin'";
+    $result_charges = db_query($charges)->fetchAll();
+    
+    $sql = "SELECT * FROM companies_last_2 WHERE cin = '$cin'";
+    $results = db_query($sql)->fetchAssoc();
+    if(count($results) > 1) {
+        $display = Array();
+        $explodeNames = explode(" ", $results['company_name']);
+        $cleanName = '';
+    foreach($explodeNames as $key => $explodeName) {
+        $explodeName = strtolower($explodeName);
+        if($explodeName == 'private' || $explodeName == 'limited' || $explodeName == 'ltd' || $explodeName == 'ltd.' || $explodeName == 'pvt.' || $explodeName == 'pvt') {
+            unset($explodeNames[$key]);
+        } else {
+            $cleanName .= $explodeName . " ";
+        }
+    }
+    $meta_keywords = array(
+        '#type' => 'html_tag',
+        '#tag' => 'meta',
+        '#attributes' => array(
+        'name' => 'keywords',
+        'content' =>  $results['company_name'].", " .$cleanName . ", " . $results['cin'] . ", " .$results['company_name']." information, ".$results['company_name']." details, ".$results['company_name']." address, ".$results['company_name']." directors, ".$results['company_name']." directors information, ".$results['company_name']." charges information, directors of " . $results['company_name'] . ", charges on " . $results['company_name'] . ", cin of " . $results['company_name']
+        ));
+    
+    drupal_add_html_head( $meta_keywords, 'meta_keywords' );
+    
+    drupal_set_title($results['company_name'] . " - ".$results['cin']." - Company information, charges, directors and contact details");
+    
+    $breadcrumb = array();
+    $breadcrumb[] = l('Home', $base_url);
+    $breadcrumb[] = l('Companies', $base_url."/companies");
+    $breadcrumb[] = ucwords(strtolower($results['company_name']));
+    
+    drupal_set_breadcrumb($breadcrumb);	
+    
+    $display['name'] = $results['company_name'];
+    $display['pincode'] = $results['pincode'];
+    
+    if(isset($results['registration_date']) && $results['registration_date'] !='NA'){  
+        $explodeDate = explode("/", $results['registration_date']);
+        $newDate = $explodeDate[1]."/".$explodeDate[0]."/".$explodeDate[2];
+        $time = strtotime($newDate);
+        $display['doi'] = date('d F Y',$time);
+        $display['incorporation_day'] = date('l', strtotime($display['doi']));
+        $dateOfIncorporation = date("d.m.Y", strtotime($newDate));
+        $dateOfIncorporation = new DateTime($dateOfIncorporation);
+        $today = new DateTime('00:00:00');
+        $diff = $today->diff($dateOfIncorporation);
+        $display['age'] = $diff->y . " years " . $diff->m . " months " . $diff->d . " days";
+        $display['ago'] = $diff->y . " years ago";
+    }
+    else{
+        $display['incorporation_day'] = '';
+        $display['doi'] = 'N/A';
+        $display['age'] = '';
+        $display['ago'] = 'N/A';
+    }
+    
+    $display['pincode'] = 'N/A';
+    if($results['company_address'] != '') {
+        $explodeAddress = explode(" ",$results['company_address']);
+        if(is_numeric(end($explodeAddress))) {
+            $display['pincode'] = end($explodeAddress);
+        }
+    }
+    
+    $display['cin'] = $results['cin'] == '' ? 'N/A' : $results['cin'];
+    $display['status'] = $results['company_status'] == '' ? 'N/A' : $results['company_status'];
+    $display['class'] = $results['company_class'] == '' ? 'N/A' : $results['company_class'];
+    $display['category'] = $results['company_category'] == '' ? 'N/A' : $results['company_category'];
+    $display['authorized_capital'] = $results['authorized_capital'] == '' ? 'N/A' : $results['authorized_capital'];
+    $display['paidup_capital'] = $results['paidup_capital'] == '' ? 'N/A' : $results['paidup_capital'];
+    $display['registered_state'] = $results['registered_state'] == '' ? 'N/A' : $results['registered_state'];
+    $display['country'] = $results['country'] == '' ? 'India' : $results['country'];
+    $display['roc'] = $results['roc'] == '' ? 'N/A' : substr($results['roc'],4);
+    $display['principal_activity'] = $results['principal_activity'] == '' ? 'N/A' : $results['principal_activity'];
+    $display['address'] = $results['company_address'] == '' ? 'N/A' : $results['company_address'];
+    $display['sub_category'] = $results['sub_category'] == '' ? 'N/A' : $results['sub_category'];
+    $display['agm_date'] = $results['date_of_last_agm'] == '' ? 'N/A' : $results['date_of_last_agm'];
+    $display['date_of_last_blnc_sheet'] = $results['date_of_last_blnc_sheet'] == '' ? 'N/A' : $results['date_of_last_blnc_sheet'];
+    
+    $description = '';
+    
+    if(substr($results['cin'], 0, 1) == "F" && strlen($results['cin']) == 6) {
+        $comp_desc = $display['name'] . " registered at Roc- ".$display['roc']." was incorporated " . $display['ago'] . " on " . $display['doi'] ."(".$display['incorporation_day']."). ";
+        $comp_desc .= "Its country of incorporation is " . $display['roc'] . ", Registrar of Companies. It is classified as foreign company.";
+        $comp_desc .= "<br/><br/>" . ucwords(strtolower($display['name'])) . "'s Foreign Company Registration Number (FCRN) is " . $results['cin'];
+        $display['comp_desc'] = $comp_desc;
+        //$description .= $comp_desc;
+        $description .= 'Find out the details about '.ucwords(strtolower($display['name'])).', charges on it (if any) and directors information including the contact details of the director and company.';
+        $display['cin_fcrn'] = $results['cin'];
+        $display['country_of_incorporation'] = $results['roc'] == '' ? '-' : $results['roc'];
+        $display['type_of_office'] = $results['category'] == '' ? '-' : $results['category'];
+        $display['comp_sub_cat'] = $results['sub_category'] == '' ? '-' : $results['sub_category'];
+    } elseif(substr($results['cin'], 0, 1) == "A" && substr($results['cin'], 3, 1) == '-') {
+        if(isset($results['date_of_last_blnc_sheet'])){
+            $display['date_of_last_blnc_sheet'] = $results['date_of_last_blnc_sheet'] == '' ? 'N/A' : $results['date_of_last_blnc_sheet'];
+        }
+    
+        if(isset($results['date_of_last_agm'])){
+            $display['agm_date'] = $results['date_of_last_agm'] == '' ? 'N/A' : $results['date_of_last_agm'];
+        }
+        $comp_desc = $display['name'] . " registered at Roc- ".$display['roc']." was incorporated " . $display['ago'] . " on " . $display['doi'] ."(".$display['incorporation_day']."). ";
+        $comp_desc .= "It is registered at " . $display['roc'] . ", Registrar of companies, and comes under " . $display['class'] . " company class. It is classified as Limited Liability Partnership firm.";
+        $comp_desc .= " Its total obligation of contribution is Rs. " . number_format($results['authorized_capital']) . ".";
+        $comp_desc .= " <br/> " . ucwords(strtolower($results['company_name'])) . "'s LLP Identification Number is (LLPIN) " . $results['cin'] . ". ";
+        $comp_desc .= " <br/> " . ucwords(strtolower($results['company_name'])) . "'s registered address is " . $display['address'];
+        $comp_desc .= " <br/> Current status of " . ucwords(strtolower($display['company_name'])) . " is - <b>" . $display['comp_status'] . "</b>.";
+        
+        $display['comp_desc'] = $comp_desc;
+        
+        $description .= 'Find out the details about '.ucwords(strtolower($display['name'])).', charges on it (if any) and directors information including the contact details of the director and company.';
+        
+        $display['cin_llp'] = $results['cin'];
+        $display['roc'] = $display['roc'];
+        $display['total_obligation'] = number_format($results['authorized_capital']);
+        $display['comp_cat'] = $display['category'] == '' ? 'N/A' : $display['category'];
+        $display['comp_sub_cat'] = $display['sub_category'] == '' ? 'N/A' : $display['sub_category'];				
+        $display['paid_up_cap'] = number_format($display['paidup_capital']);
+    } else {
+        if(stripos(strtolower($display['class']),'publ') !== false)
+        {
+            $display['classification'] = "Public Company";
+        }
+        else if(stripos(strtolower($display['class']),'priv') !== false){
+            $display['classification'] = "Private Company";
+        }
+        else {
+            $display['classification'] = "One Person Company";
+        }
+        $comp_desc = $display['name'] . " is ".$display['classification'].". It is registered at Roc- ".$display['roc']." was incorporated " . $display['ago'] . " on " . $display['doi'] ."(".$display['incorporation_day']."). ";
+        $comp_desc .= "It is registered at " . $display['roc'] . ", Registrar of companies, and comes under " . $display['class'] . " company class. It is classified as " . $display['classification'];
+        $comp_desc .= ". It is categorised as " . $display['category'] . " and " . $display['sub_category'] . ".<br><br/>";
+        $comp_desc .= ucwords(strtolower($display['name'])) . " <b>Corporate Identification Number (CIN)</b> is  " . $results['cin'] . " and Registration Number is " . substr($results['cin'],15) . ".<br/><br/>";
+        $comp_desc .= ucwords(strtolower($results['company_name']))." Annual General Meeting (AGM) was last held on " . $display['agm_date'] ." as per records from Ministry of Corporate Affairs (MCA). Its balance sheet was last filed on ".$display['date_of_last_blnc_sheet'] . ". It is involved in " . $results['principal_activity'] . "<br><br/>";
+        $comp_desc .= ucwords(strtolower($results['company_name']))." authorized share capital is &#8377; " . $results['authorized_capital'] . " and paid up capital is &#8377; " . $results['paidup_capital'] . ".";
+        $comp_desc .=  " It's registered address at Registrar of Companies, ".str_replace("RoC-", "", $results['roc'])." is \"<b>" . ucwords(strtolower($display['address']))."\".</b>";
+        
+        $description .= $display['name'] . " is " . $display['classification'] . " registered at " . $display['roc'] . ".Here you can get the complete information on " .$display['name']. ", contact details, charges on it (if any) and directors information including the contact details of the director and company.";
+        
+        $comp_desc .= '<br/><br/>Current status of ' . ucwords(strtolower($results['company_name'])) . " is <b>" . $display['status'] . "</b>.";
+        
+        $display['comp_desc'] = $comp_desc;
+        $display['cin_pvt'] = $results['cin'];
+        $display['email'] = $result_email['email'];
+        $display['website'] = $result_website['website'];
+        $display['activity'] = $results['principal_activity'];
+        $display['roc'] = $results['roc'];
+        $display['reg_num'] = substr($results['cin'],15);
+        $display['comp_cat'] = $display['category'] == '' ? 'N/A' : $display['category'];
+        $display['comp_sub_cat'] = $display['sub_category'] == '' ? 'N/A' : $display['sub_category'];
+        $display['auth_cap'] = $results['authorized_capital'] == '' ? 'N/A' : $results['authorized_capital'];
+        $display['paid_up_cap'] = $results['paidup_capital'] == '' ? 'N/A' : $results['paidup_capital'];
+        
+        if(substr($results['cin'],0,1) == "U"){
+            $display['listed'] = "Unlisted";
+        }
+        elseif(substr($results['cin'],0,1) == "L") {
+            $display['listed'] = "Listed";
+        } else{
+            $display['listed'] = "Unlisted";
+        }
+    }
+    
+    $meta_description = array(
+        '#type' => 'html_tag',
+        '#tag' => 'meta',
+        '#attributes' => array(
+        'name' => 'description',
+        'content' =>  $description
+    ));
+    
+    drupal_add_html_head( $meta_description, 'meta_description' );
+    
+    if(user_is_logged_in()) {
+        $update_btn = ctools_ajax_text_button("<i class='fa fa-refresh' aria-hidden='true'></i> Update Information", 'update/'.$cin, t('Update Information'), 'update_' . $cin . ' btn btn-info btn-block');
+        $buy_all = ctools_ajax_text_button("<i class='fa fa-shopping-cart' aria-hidden='true'></i> Add to Cart", 'buy-company-documents/'.$cin, t('Add to Cart'), 'add_to_cart_' . $cin . ' btn btn-warning btn-block');
+    } else {
+        $update_btn = "<a href=" . $base_url . "/user/login?destination=company/".strtolower($name)."/".strtolower($cin) . " class='btn btn-info btn-block' style='font-weight:bold'><i class='fa fa-refresh' aria-hidden='true'></i>
+    Update Information</a>";
+        
+        $buy_all = "<a href=" . $base_url . "/user/login?destination=company/".strtolower($name)."/".strtolower($cin) . " class='btn btn-warning btn-block' style='font-weight:bold'><i class='fa fa-shopping-cart' aria-hidden='true'></i>
+    Add to Cart</a>";
+    }
+    
+        return theme('company_detail_page', array('result' => $display,'directors' => $result_directors,'charges' => $result_charges,'result_similiar_comp' =>$result_similiar_comp,'startingLetter' => $startingLetter,'update_btn'=>$update_btn,'buy_all' => $buy_all));
+    } else {
+            $name = str_ireplace("-", " ", $name);
+            $exploding = explode(" ",trim($name));
+            $nameString = $exploding[0];
+            $sql ="select cin, company_name, registration_date,company_address,company_status from companies_last_2 where company_name like '%".$nameString."%' limit 50";
+            $result_similar = db_query($sql)->fetchAll();
+            return theme('no_company_found_page', array('similar' => $result_similar));
+        }
+    }
+}
+
+function company_charges($name, $cin) {
+if($cin != '') { 
+    global $base_url; global $user;
+    $startingLetter = substr($name,0,2);
+    //Getting similiar companies
+    $similiar_comp = "SELECT cin,company_name FROM companies_last_2 WHERE company_name LIKE '$startingLetter%' AND cin != '$cin' LIMIT 10";
+    $result_similiar_comp = db_query($similiar_comp)->fetchAll();
+    
+    $sql = "SELECT * FROM company_charges_last_2 WHERE cin LIKE '$cin'";
+    $results = db_query($sql)->fetchAll();
+    
+    if(count($results) > 0) {
+        $meta_keywords = array(
+        '#type' => 'html_tag',
+        '#tag' => 'meta',
+        '#attributes' => array(
+        'name' => 'keywords',
+        'content' =>  $results[0]->company_name . " charges, charges on " . $results[0]->company_name.", ".$results[0]->company_name." charges details, ".$results[0]->company_name." charges holding bank address, ".$results[0]->company_name." charges creation date information, Charges associated with " . $results[0]->company_name.", charges information"
+        )
+    );
+
+        drupal_add_html_head( $meta_keywords, 'meta_keywords' );
+        
+        $meta_description = array(
+        '#type' => 'html_tag',
+        '#tag' => 'meta',
+        '#attributes' => array(
+        'name' => 'description',
+        'content' => 'Find out the details about charges on '.$results[0]->company_name.' with charges creation date and their charge holders details with address.'
+        ));
+
+        drupal_add_html_head( $meta_description, 'meta_description' );
+        drupal_set_title($results[0]->company_name . " - Charges information and charge holders details with address.");
+        
+        $company_name = trim($results[0]->company_name);	
+        $company_name = preg_replace("/[^a-zA-Z0-9]/", " ", $company_name);
+        $company_name = trim(preg_replace('/-/', ' ', $company_name));
+        $company_name = trim(preg_replace('/\s+/', ' ', $company_name));
+        $company_name = strtoupper($company_name);
+        $company_terms = explode(' ',$company_name);
+
+        $url = $base_url.'/company/'.implode('-',$company_terms).'/'.$results[0]->cin;
+        
+        $breadcrumb = array();
+        $breadcrumb[] = l('Home', $base_url);
+        $breadcrumb[] = l(ucwords(strtolower($results[0]->company_name)), $url);
+        $breadcrumb[] = ucwords(strtolower('Charges information'));
+
+        drupal_set_breadcrumb($breadcrumb);	
+            return theme('company_charge_detail_page',array('results' => $results,'result_similiar_comp' =>$result_similiar_comp,'startingLetter' => $startingLetter));
+        } else {
+                $name = str_ireplace("-", " ", $name);
+                return theme('no_company_charges_found_page', array('c_name' => $name,'cin' => $cin,'result_similiar_comp' => $result_similiar_comp,'startingLetter' => $startingLetter));
+        }
+    }
+}
+
+function company_address($name, $cin) {
+    if($cin != '') { 
+        global $base_url; global $user;
+        $startingLetter = substr($name,0,2);
+    //Getting similiar companies
+    $similiar_comp = "SELECT cin,company_name FROM companies_last_2 WHERE company_name LIKE '$startingLetter%' AND cin != '$cin' LIMIT 10";
+    $result_similiar_comp = db_query($similiar_comp)->fetchAll();
+    
+    $sql = "SELECT company_name,cin,company_address,pincode FROM companies_last_2 WHERE cin LIKE '$cin'";
+    $results = db_query($sql)->fetchAll();
+
+    if(count($results) > 0) {
+        $meta_keywords = array(
+        '#type' => 'html_tag',
+        '#tag' => 'meta',
+        '#attributes' => array(
+        'name' => 'keywords',
+        'content' =>  $results[0]->company_name . " address, address of " . $results[0]->company_name.", ".$results[0]->company_name." contact address details"
+        )
+        );
+        
+            drupal_add_html_head( $meta_keywords, 'meta_keywords' );
+
+            $meta_description = array(
+            '#type' => 'html_tag',
+            '#tag' => 'meta',
+            '#attributes' => array(
+            'name' => 'description',
+            'content' => 'Find out the address of '.$results[0]->company_name.' with map.'
+            ));
+
+            drupal_add_html_head( $meta_description, 'meta_description' );
+
+            drupal_set_title($results[0]->company_name . " - Address information with map.");
+
+            $company_name = trim($results[0]->company_name);	
+            $company_name = preg_replace("/[^a-zA-Z0-9]/", " ", $company_name);
+            $company_name = trim(preg_replace('/-/', ' ', $company_name));
+            $company_name = trim(preg_replace('/\s+/', ' ', $company_name));
+            $company_name = strtoupper($company_name);
+
+            $company_terms = explode(' ',$company_name);
+
+            $url = $base_url.'/company/'.implode('-',$company_terms).'/'.$results[0]->cin;
+
+            $breadcrumb = array();
+            $breadcrumb[] = l('Home', $base_url);
+            $breadcrumb[] = l(ucwords(strtolower($results[0]->company_name)), $url);
+            $breadcrumb[] = ucwords(strtolower('Address'));
+
+            drupal_set_breadcrumb($breadcrumb);	
+
+            return theme('company_address_detail_page',array('results' => $results,'result_similiar_comp' =>$result_similiar_comp,'startingLetter' => $startingLetter));
+        }
+    }
+}
+
+
+function company_directors($name, $cin) {
+if($cin != '') { 
+    global $base_url; global $user;
+    $startingLetter = substr($name,0,3);
+    //Getting similiar companies
+    $similiar_comp = "SELECT cin,company_name FROM companies_last_2 WHERE company_name LIKE '$startingLetter%' AND cin != '$cin' LIMIT 10";
+    $result_similiar_comp = db_query($similiar_comp)->fetchAll();
+
+    $sql = "SELECT * FROM directors_last_2 WHERE cin LIKE '$cin'";
+    $results = db_query($sql)->fetchAll();
+
+    if(count($results) > 0) {
+        $meta_keywords = array(
+        '#type' => 'html_tag',
+        '#tag' => 'meta',
+        '#attributes' => array(
+        'name' => 'keywords',
+        'content' =>  $results[0]->company_name . " directors, directors of " . $results[0]->company_name.", ".$results[0]->company_name." directors details, ".$results[0]->company_name." director address, ".$results[0]->company_name." director corporate information, ".$results[0]->company_name." directors associated companies information, ".$results[0]->company_name." directors information, ".$results[0]->company_name." director contact details"
+            )
+        );
+    
+        drupal_add_html_head( $meta_keywords, 'meta_keywords' );
+        $meta_description = array(
+        '#type' => 'html_tag',
+        '#tag' => 'meta',
+        '#attributes' => array(
+        'name' => 'description',
+        'content' => 'Find out the details about directors of '.$results[0]->company_name.' with their contact details and companies associated with them.'
+        ));
+
+        drupal_add_html_head( $meta_description, 'meta_description' );
+
+        drupal_set_title($results[0]->company_name . " - Director information and companies associated with.");
+        
+        $company_name = trim($results[0]->company_name);	
+        $company_name = preg_replace("/[^a-zA-Z0-9]/", " ", $company_name);
+        $company_name = trim(preg_replace('/-/', ' ', $company_name));
+        $company_name = trim(preg_replace('/\s+/', ' ', $company_name));
+        $company_name = strtoupper($company_name);
+
+        $company_terms = explode(' ',$company_name);
+        
+        $url = $base_url.'/company/'.implode('-',$company_terms).'/'.$results[0]->cin;
+        
+        $breadcrumb = array();
+        $breadcrumb[] = l('Home', $base_url);
+        $breadcrumb[] = l(ucwords(strtolower($results[0]->company_name)), $url);
+        $breadcrumb[] = ucwords(strtolower('Directors information'));
+
+        drupal_set_breadcrumb($breadcrumb);	
+        
+        return theme('company_director_detail_page',array('results' => $results,'result_similiar_comp' => $result_similiar_comp,'startingLetter' => $startingLetter));
+        } else {
+            $name = str_ireplace("-", " ", $name);
+            return theme('no_company_director_found_page', array('c_name' => $name,'cin' => $cin,'result_similiar_comp' => $result_similiar_comp,'startingLetter' => $startingLetter));
+        }
+    }
+}
+
+function director_arguments($name, $din){
+$name = str_ireplace("-", " ", $name);
+$fullName = $name;
+
+$exploding = explode(" ",trim($name));
+
+$nameString = preg_replace("/[^a-zA-Z0-9]/", " ", $exploding[0]);
+
+$sql ="select * from directors_last_2 where dir_name like '%".$nameString."%' limit 10";
+$result_similar = db_query($sql)->fetchAll();
+
+if($din != '' && is_numeric($din)){
+        global $base_url; global $user;
+
+        $sql = "SELECT DISTINCT din,dir_name,dir_address,post, date_of_appointment,cin,company_name FROM directors_last_2 WHERE din LIKE '$din'";
+        $results = db_query($sql)->fetchAll(); 
+        if(count($results) > 0){
+            $display = Array();
+            $meta_keywords = array(
+            '#type' => 'html_tag',
+            '#tag' => 'meta',
+            '#attributes' => array(
+            'name' => 'keywords',
+            'content' =>  $results[0]->dir_name . ", " . $results[0]->din . ", " . $results[0]->dir_name  . " din number, " . $results[0]->dir_name." information, ".$results[0]->dir_name." director details, ".$results[0]->dir_name." address, ".$results[0]->dir_name."  corporate information, ".$results[0]->dir_name." associated companies information, ".$results[0]->dir_name." associated companies details, ".$results[0]->dir_name." contact details",
+            ));
+
+        drupal_add_html_head( $meta_keywords, 'meta_keywords' );
+        $meta_description = array(
+        '#type' => 'html_tag',
+        '#tag' => 'meta',
+        '#attributes' => array(
+        'name' => 'description',
+        //'content' =>  $results[0]->dir_name . " is a registered director with Ministry of Corporate Affairs(MCA). Their Director Identification Number(DIN) is $din. " . $results[0]->dir_name . " 's registered address at MCA is " . $results[0]->dir_address . ". View director profile, director information, contact information and list of companies associated with; of " . $results[0]->dir_name
+        'content' => $results[0]->dir_name.' din number (din) details, his/her companies details including the contact and financial details about each of the company and their directors and charges on company (if any).'
+        ));
+
+        drupal_add_html_head( $meta_description, 'meta_description' );
+        drupal_set_title($results[0]->dir_name . " - " . $results[0]->din . " - Director information and companies associated with");
+        $breadcrumb = array();
+        $breadcrumb[] = l('Home', $base_url);
+        $breadcrumb[] = l('Directors', $base_url."/director-list");
+        $breadcrumb[] = ucwords(strtolower($results[0]->dir_name));
+
+        drupal_set_breadcrumb($breadcrumb);	
+        return theme('director_detail_page',array('results' => $results,'result_similar' => $result_similar));
+        } else {
+            return theme('no_director_found_page',array('fullName' => $fullName,'result_similar' => $result_similar));
+        }
+    } else {
+        return theme('no_director_found_page',array('fullName' => $fullName,'result_similar' => $result_similar));
+    }
+}
+/**
+* Implements hook_mail for module_name.
+*/
+function company_mail($key, &$message, $params){
+    // Set the mail content type to html to send an html e-mail (optional).
+    $message['headers']['Content-Type'] = 'text/html; charset=UTF-8; format=flowed';
+    // Grab the subject and body from params and add it to the message.
+    $message['subject'] = $params['subject'];
+    $message['body'][] = $params['body']; // Drupal 7
+    switch ($key) {
+    case "website_add":
+    // Make other changes here if desired...
+    break;
+    case "company_email_add":
+    // Make other changes here if desired...
+    break;
+    
+    
+    }
+}

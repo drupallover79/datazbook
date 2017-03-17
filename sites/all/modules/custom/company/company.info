@@ -1,0 +1,7 @@
+name = Company
+description = Company Management Module
+package = Datazbook
+core = 7.x
+
+
+
